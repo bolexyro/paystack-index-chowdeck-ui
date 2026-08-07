@@ -1,0 +1,994 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A practical guide to the Paystack Index Chowdeck MCP tools, payloads, and composable UI surfaces."
+    />
+    <title>Paystack Index × Chowdeck — Tool map</title>
+    <style>
+      :root {
+        --ink: #122019;
+        --muted: #66756b;
+        --line: #dfe7df;
+        --cream: #f6f8f3;
+        --card: #ffffff;
+        --green: #14512f;
+        --green-2: #1c6a3e;
+        --lime: #dfff6b;
+        --lime-soft: #f1ffc0;
+        --orange: #d56845;
+        --blue: #2c6dce;
+        --shadow: 0 20px 60px rgba(22, 56, 35, 0.08);
+        color-scheme: light;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 88% 3%, rgba(223, 255, 107, .28), transparent 25rem),
+          var(--cream);
+        color: var(--ink);
+        font: 15px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      a { color: inherit; }
+      button, summary { font: inherit; }
+      button { cursor: pointer; }
+      code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+      .page { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+
+      .site-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 28px 0 18px;
+      }
+      .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; letter-spacing: -.02em; }
+      .brand-mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 10px;
+        background: var(--green);
+        color: var(--lime);
+        font-weight: 900;
+      }
+      .brand small { display: block; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+      nav a {
+        padding: 7px 11px;
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      nav a:hover, nav a:focus-visible { background: #e7f0e5; color: var(--green); outline: none; }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+        gap: 42px;
+        padding: clamp(34px, 6vw, 74px);
+        border-radius: 28px;
+        background: var(--green);
+        color: white;
+        box-shadow: var(--shadow);
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        width: 440px;
+        height: 440px;
+        right: -150px;
+        top: -220px;
+        border: 84px solid rgba(223, 255, 107, .1);
+        border-radius: 50%;
+      }
+      .eyebrow { margin: 0 0 12px; color: var(--lime); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+      h1, h2, h3 { margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; letter-spacing: -.055em; line-height: 1.05; }
+      .hero h1 { max-width: 740px; font-size: clamp(42px, 7vw, 78px); }
+      .hero-copy { position: relative; z-index: 1; }
+      .hero-copy > p:not(.eyebrow) { max-width: 610px; margin: 20px 0 0; color: rgba(255,255,255,.76); font-size: 17px; }
+      .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        background: var(--lime);
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+      }
+      .button.secondary { border-color: rgba(255,255,255,.25); background: transparent; color: white; }
+      .button:hover, .button:focus-visible { transform: translateY(-1px); outline: 3px solid rgba(223,255,107,.35); outline-offset: 2px; }
+      .hero-rail { position: relative; z-index: 1; align-self: end; display: grid; gap: 10px; }
+      .metric { padding: 17px 18px; border: 1px solid rgba(255,255,255,.18); border-radius: 16px; background: rgba(255,255,255,.08); }
+      .metric strong { display: block; color: var(--lime); font-size: 28px; letter-spacing: -.06em; }
+      .metric span { color: rgba(255,255,255,.7); font-size: 12px; }
+
+      .section { padding: 86px 0 0; }
+      .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+      .section-heading h2 { font-size: clamp(30px, 4vw, 48px); }
+      .section-heading p { max-width: 480px; margin: 0; color: var(--muted); font-size: 14px; }
+      .kicker { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 11px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+      .kicker::before { content: ""; width: 19px; height: 19px; border-radius: 7px; background: var(--lime); box-shadow: inset 0 0 0 5px var(--green); }
+
+      .principles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .principle { padding: 25px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,.7); }
+      .principle h3 { margin-bottom: 9px; font-size: 21px; }
+      .principle p { margin: 0; color: var(--muted); font-size: 13px; }
+      .principle strong { color: var(--green); }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+      .flow-step { position: relative; padding: 21px 18px 19px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: 0 9px 30px rgba(22,56,35,.04); }
+      .flow-step:not(:last-child)::after { content: "→"; position: absolute; top: 25px; right: -17px; z-index: 2; display: grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; background: var(--lime); color: var(--green); font-weight: 900; }
+      .flow-number { display: grid; width: 27px; height: 27px; place-items: center; margin-bottom: 18px; border-radius: 9px; background: var(--green); color: var(--lime); font-size: 12px; font-weight: 900; }
+      .flow-step h3 { margin-bottom: 7px; font-size: 18px; }
+      .flow-step p { margin: 0; color: var(--muted); font-size: 12px; }
+      .flow-step code { color: var(--green); font-size: 11px; font-weight: 700; }
+
+      .tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+      .full-index-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .live-call-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tool-card { overflow: hidden; border: 1px solid var(--line); border-radius: 21px; background: var(--card); box-shadow: 0 9px 30px rgba(22,56,35,.04); }
+      .tool-card-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding: 22px 23px 15px; }
+      .tool-card h3 { font-size: 21px; }
+      .tool-card-head p { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+      .tag { flex: none; padding: 5px 8px; border-radius: 99px; background: var(--lime-soft); color: var(--green); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+      .tag.action { background: #fff0e9; color: #a1462e; }
+      details { border-top: 1px solid #edf1ec; }
+      summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 23px; color: var(--green); font-size: 12px; font-weight: 800; list-style: none; cursor: pointer; }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { content: "+"; color: var(--muted); font-size: 18px; font-weight: 400; }
+      details[open] summary::after { content: "−"; }
+      .code-wrap { position: relative; padding: 0 23px 20px; }
+      pre { overflow: auto; max-height: 300px; margin: 0; padding: 16px; border: 1px solid #e3ebe1; border-radius: 13px; background: #f5f8f3; color: #263a2d; font-size: 11px; line-height: 1.6; }
+      .copy {
+        position: absolute;
+        top: 9px;
+        right: 33px;
+        padding: 5px 8px;
+        border: 1px solid #d9e4d8;
+        border-radius: 8px;
+        background: white;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .copy:hover, .copy:focus-visible { border-color: var(--green); color: var(--green); outline: none; }
+      .note { margin: 0 23px 20px; padding: 11px 13px; border-left: 3px solid var(--lime); border-radius: 0 10px 10px 0; background: #f7faee; color: #647064; font-size: 11px; }
+      .live-banner { display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center; margin: 0 0 18px; padding: 17px 20px; border: 1px solid #d7e7c1; border-radius: 18px; background: linear-gradient(110deg, #f3ffd2, #ffffff); }
+      .live-banner strong { display: inline-grid; min-width: 88px; min-height: 36px; place-items: center; border-radius: 10px; background: var(--green); color: var(--lime); font-size: 12px; }
+      .live-banner p { margin: 0; color: #536359; font-size: 12px; }
+      .live-card .tool-card-head { padding-bottom: 17px; }
+      .live-card pre { max-height: 260px; }
+      .live-card .tag { background: #e4f5e1; }
+      .live-card .tag.redacted { background: #fff1df; color: #9b5c1b; }
+      .live-card .response-note { margin: 0 23px 20px; color: var(--muted); font-size: 11px; }
+      .not-called { margin-top: 18px; padding: 21px 23px; border: 1px solid #f0d6c7; border-radius: 18px; background: #fff8f4; }
+      .not-called h3 { margin-bottom: 8px; font-size: 19px; }
+      .not-called p { margin: 0 0 12px; color: #785d51; font-size: 12px; }
+      .not-called ul { display: grid; gap: 7px; margin: 0; padding-left: 18px; color: #6b5d57; font-size: 12px; }
+      .not-called code { color: #9a4b31; font-weight: 700; }
+
+      .adapter-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 20px; background: var(--card); box-shadow: 0 9px 30px rgba(22,56,35,.04); }
+      table { width: 100%; border-collapse: collapse; min-width: 760px; }
+      th, td { padding: 16px 18px; border-bottom: 1px solid #edf1ec; text-align: left; vertical-align: top; }
+      th { background: #f7faf5; color: #728076; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+      tr:last-child td { border-bottom: 0; }
+      td:first-child { width: 245px; color: var(--green); font-weight: 800; }
+      td:nth-child(2) { width: 36%; color: var(--muted); font-size: 13px; }
+      td:last-child { color: #43534a; font-size: 13px; }
+      td code { font-size: 11px; }
+      .ui-section { display: grid; grid-template-columns: minmax(0, .92fr) minmax(0, 1.08fr); gap: 18px; align-items: stretch; }
+      .ui-card { padding: 27px; border: 1px solid var(--line); border-radius: 22px; background: var(--card); box-shadow: 0 9px 30px rgba(22,56,35,.04); }
+      .ui-card h3 { margin-bottom: 10px; font-size: 24px; }
+      .ui-card > p { margin: 0 0 22px; color: var(--muted); font-size: 13px; }
+      .ui-list { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
+      .ui-list li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+      .ui-list b { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 8px; background: var(--lime); color: var(--green); font-size: 11px; }
+      .ui-list span { color: #54635a; font-size: 13px; }
+      .ui-list code { color: var(--green); font-weight: 700; }
+      .code-panel { overflow: hidden; padding: 0; background: #10251a; color: #dfffe0; }
+      .code-panel .panel-head { display: flex; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(223,255,107,.15); color: var(--lime); font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      .code-panel pre { max-height: none; padding: 21px; border: 0; border-radius: 0; background: transparent; color: #dfffe0; font-size: 12px; }
+      .code-panel .accent { color: var(--lime); }
+      .code-panel .dim { color: #94b69b; }
+
+      .rules { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+      .rule { padding: 20px; border-radius: 17px; background: #eaf2e8; }
+      .rule h3 { margin-bottom: 7px; font-size: 17px; }
+      .rule p { margin: 0; color: var(--muted); font-size: 12px; }
+      footer { display: flex; justify-content: space-between; gap: 20px; margin: 84px 0 35px; padding-top: 19px; border-top: 1px solid var(--line); color: #7b897f; font-size: 11px; }
+      footer strong { color: var(--green); }
+
+      @media (max-width: 850px) {
+        .hero, .ui-section { grid-template-columns: 1fr; }
+        .hero-rail { grid-template-columns: repeat(3, 1fr); }
+        .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .flow-step:nth-child(2)::after { display: none; }
+        .tool-grid, .principles { grid-template-columns: 1fr; }
+        .rules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 600px) {
+        .page { width: min(100% - 28px, 540px); }
+        .site-header { align-items: start; flex-direction: column; padding-top: 18px; }
+        nav { justify-content: flex-start; }
+        .hero { padding: 31px 24px; border-radius: 22px; }
+        .hero h1 { font-size: 43px; }
+        .hero-copy > p:not(.eyebrow) { font-size: 15px; }
+        .hero-rail { grid-template-columns: 1fr; }
+        .section { padding-top: 58px; }
+        .section-heading { display: block; }
+        .section-heading p { margin-top: 12px; }
+        .flow, .rules { grid-template-columns: 1fr; }
+        .flow-step:not(:last-child)::after { display: none; }
+        .tool-card-head { display: block; }
+        .tag { display: inline-block; margin-top: 12px; }
+        footer { display: block; }
+        footer span { display: block; margin-top: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="site-header">
+        <a class="brand" href="#overview">
+          <span class="brand-mark">C</span>
+          <span>Chowdeck on Index<small>Paystack Index MCP guide</small></span>
+        </a>
+        <nav aria-label="Page sections">
+          <a href="#flow">Flow</a>
+          <a href="#index-tools">Index tools</a>
+          <a href="#live-calls">Live calls</a>
+          <a href="#adapter-tools">Adapter tools</a>
+          <a href="#ui">UI layer</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero" id="overview">
+          <div class="hero-copy">
+            <p class="eyebrow">Paystack Index × Chowdeck</p>
+            <h1>From a tool call to a useful decision.</h1>
+            <p>
+              Paystack Index supplies the live commerce primitives. The Chowdeck adapter turns those primitives into a small, composable experience the agent can present at the right moment.
+            </p>
+            <div class="hero-actions">
+              <a class="button" href="#flow">See the flow</a>
+              <a class="button secondary" href="#ui">Where UI appears</a>
+            </div>
+          </div>
+          <div class="hero-rail" aria-label="Guide summary">
+            <div class="metric"><strong>9</strong><span>upstream Index tools</span></div>
+            <div class="metric"><strong>8</strong><span>Chowdeck adapter tools</span></div>
+            <div class="metric"><strong>1</strong><span>focused decision at a time</span></div>
+          </div>
+        </section>
+
+        <section class="section" id="live-calls" aria-labelledby="live-calls-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">Observed against live MCP</div>
+              <h2 id="live-calls-title">Calls we actually made.</h2>
+            </div>
+            <p>These are real responses from the configured Paystack Index connection, captured on 1 August 2026. Address fields and location-scoped links are redacted; the response shapes and useful records are preserved.</p>
+          </div>
+
+          <div class="live-banner">
+            <strong>7 live calls</strong>
+            <p>We ran the safe, read-only path: discover Chowdeck, check balances and activity, resolve the saved-address choice, search pizza, browse nearby vendors, and open a vendor menu.</p>
+          </div>
+
+          <div class="tool-grid live-call-grid">
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>browse_merchants</code></h3><p>Food directory lookup.</p></div>
+                <span class="tag">live · read-only</span>
+              </div>
+              <details open>
+                <summary>Call</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-browse-call">Copy</button>
+                  <pre id="live-browse-call"><code>{
+  "category": "food",
+  "include_coming_soon": false
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Live structured response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-browse-response">Copy</button>
+                  <pre id="live-browse-response"><code>{
+  "merchants": [
+    {
+      "id": "chowdeck",
+      "name": "Chowdeck",
+      "category": "food",
+      "description": "Food delivery across Nigeria",
+      "status": "live",
+      "requires_link": true,
+      "featured": true,
+      "supported_regions": ["NG"]
+    }
+  ],
+  "count": 1
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">Text response: “Merchants in food (1): Chowdeck — Food delivery across Nigeria. Requires linking.”</p>
+            </article>
+
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>get_balance</code></h3><p>Index and linked Zap balance.</p></div>
+                <span class="tag">live · read-only</span>
+              </div>
+              <details open>
+                <summary>Call + live response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-balance-response">Copy</button>
+                  <pre id="live-balance-response"><code>// call: {}
+{
+  "currency": "NGN",
+  "balance_kobo": 0,
+  "balance_naira": 0,
+  "zap_linked": false,
+  "zap_balance_kobo": null,
+  "welcome_grant_remaining_kobo": 0
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">Text response: “No Zap account is linked. Ask the user to link Zap from the Index dashboard so their agent can pay for purchases.”</p>
+            </article>
+
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>get_recent_activity</code></h3><p>Index activity feed.</p></div>
+                <span class="tag">live · read-only</span>
+              </div>
+              <details open>
+                <summary>Call + live response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-activity-response">Copy</button>
+                  <pre id="live-activity-response"><code>// call: { "source": "index", "limit": 5 }
+{
+  "items": [],
+  "count": 0
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">Text response: “No activity yet. Buy Index credits on the dashboard to get started.”</p>
+            </article>
+
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>find_items</code></h3><p>First pizza search, before an address is selected.</p></div>
+                <span class="tag redacted">live · redacted</span>
+              </div>
+              <details open>
+                <summary>Call</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-address-call">Copy</button>
+                  <pre id="live-address-call"><code>{
+  "merchant_id": "chowdeck",
+  "query": "pizza",
+  "limit": 5
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Live response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-address-response">Copy</button>
+                  <pre id="live-address-response"><code>{
+  "needs_address_choice": true,
+  "current_address_id": "[redacted]",
+  "total_addresses": 2
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">The text response showed the current saved address (redacted here) and said there was one other saved address. The next call used the current address ID.</p>
+            </article>
+
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>find_items</code></h3><p>Pizza results after address selection.</p></div>
+                <span class="tag">live · read-only</span>
+              </div>
+              <details open>
+                <summary>Call + selected response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-pizza-response">Copy</button>
+                  <pre id="live-pizza-response"><code>// call: { "merchant_id": "chowdeck", "address_id": "[redacted]", "query": "pizza", "limit": 5 }
+{
+  "query": "pizza",
+  "count": 10,
+  "all_closed": false,
+  "results": [
+    { "vendor_id": 106110, "vendor_name": "Dodo Pizza - Alausa", "item_id": 4255584, "item_name": "Chicken Teriyaki Pizza - M", "price_naira": 9100, "eta_minutes": 30, "delivery_fee_naira": 650, "rating": 4.16, "is_open": true },
+    { "vendor_id": 106110, "vendor_name": "Dodo Pizza - Alausa", "item_id": 247900, "item_name": "Shawarma pizza - l", "price_naira": 11300, "eta_minutes": 30, "delivery_fee_naira": 650, "rating": 4.16, "is_open": true },
+    { "vendor_id": 106110, "vendor_name": "Dodo Pizza - Alausa", "item_id": 4255585, "item_name": "Chicken Teriyaki Pizza - L", "price_naira": 11500, "eta_minutes": 30, "delivery_fee_naira": 650, "rating": 4.16, "is_open": true },
+    { "vendor_id": 106110, "vendor_name": "Dodo Pizza - Alausa", "item_id": 247903, "item_name": "Cheeseburger Pizza - L", "price_naira": 11800, "eta_minutes": 30, "delivery_fee_naira": 650, "rating": 4.16, "is_open": true },
+    { "vendor_id": 106110, "vendor_name": "Dodo Pizza - Alausa", "item_id": 247863, "item_name": "Combo for 1", "price_naira": 14600, "requires_options": true }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">The live tool returned 10 matches even though the request asked for 5. It also returned a hosted photo catalog link; that location-scoped URL is omitted here.</p>
+            </article>
+
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>find_items</code></h3><p>Nearby restaurant feed after address selection.</p></div>
+                <span class="tag">live · read-only</span>
+              </div>
+              <details open>
+                <summary>Call + live response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-nearby-response">Copy</button>
+                  <pre id="live-nearby-response"><code>// call: { "merchant_id": "chowdeck", "address_id": "[redacted]", "limit": 5 }
+{
+  "count": 5,
+  "open_count": 5,
+  "results": [
+    { "vendor_id": 106744, "vendor_name": "Citysubs - Magodo", "distance_km": 0.61, "rating": 4.52, "eta_minutes": 57, "delivery_fee_naira": 550, "is_open": true },
+    { "vendor_id": 108757, "vendor_name": "Medplus Pharmacy - Oba Ogunnusi", "distance_km": 2.8, "rating": 4.62, "eta_minutes": 21, "delivery_fee_naira": 700, "is_open": true },
+    { "vendor_id": 153226, "vendor_name": "My Noodles Café (Indomie Cafe) - OGUNUSI", "distance_km": 3.33, "rating": 4.54, "eta_minutes": 70, "delivery_fee_naira": 800, "is_open": true },
+    { "vendor_id": 100973, "vendor_name": "The Place - Ogba", "distance_km": 4.31, "rating": 4.16, "eta_minutes": 51, "delivery_fee_naira": 900, "is_open": true },
+    { "vendor_id": 162823, "vendor_name": "FINESTFUSIONCOCKTAILS", "distance_km": 4.58, "rating": 5, "eta_minutes": 45, "delivery_fee_naira": 900, "is_open": true }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">Text response: “5 restaurants open near you.” Each result included distance, rating, ETA, delivery fee, and vendor ID.</p>
+            </article>
+
+            <article class="tool-card live-card">
+              <div class="tool-card-head">
+                <div><h3><code>find_items</code></h3><p>Full menu for the selected pizza vendor.</p></div>
+                <span class="tag">live · read-only</span>
+              </div>
+              <details open>
+                <summary>Call + menu summary</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="live-menu-response">Copy</button>
+                  <pre id="live-menu-response"><code>// call: { "merchant_id": "chowdeck", "vendor_id": 106110, "address_id": "[redacted]" }
+{
+  "vendor_id": 106110,
+  "vendor_name": "Dodo Pizza - Alausa",
+  "is_open": true,
+  "category_count": 13,
+  "item_count": 77,
+  "available_item_count": 77,
+  "unavailable_item_count": 0,
+  "sample_items": [
+    { "item_id": 4255584, "item_name": "Chicken Teriyaki Pizza - M", "price_naira": 9100 },
+    { "item_id": 247895, "item_name": "Dodo Supreme - M", "price_naira": 9600 },
+    { "item_id": 247939, "item_name": "Margherita - M", "price_naira": 7900 }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="response-note">Text response: “Dodo Pizza - Alausa — 77 items across 13 categories.” The upstream grouped the full menu by category and marked all 77 items available.</p>
+            </article>
+          </div>
+
+          <div class="not-called">
+            <h3>Tools I did not invoke in this test</h3>
+            <p>They are present in the live nine-tool catalog, but calling them would cross a user-consent boundary or require an identifier we do not have.</p>
+            <ul>
+              <li><code>connect_merchant</code> — sends an OTP; needs a phone number confirmed by the user.</li>
+              <li><code>quick_buy</code> — needs a concrete purchase and can charge when confirmed.</li>
+              <li><code>order</code> — needs a real basket; its confirmation path places the order.</li>
+              <li><code>request_transfer_approval</code> — needs bank and recipient details and creates a transfer approval token.</li>
+              <li><code>track_order</code> — read-only, but needs a real Chowdeck order ID from a prior purchase.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="mental-model-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">The mental model</div>
+              <h2 id="mental-model-title">Index is the engine. The UI is the moment.</h2>
+            </div>
+            <p>
+              A data tool gives the agent facts to reason over. A render tool gives the user a focused surface for the next choice. Keeping those responsibilities separate is what makes the experience composable.
+            </p>
+          </div>
+          <div class="principles">
+            <article class="principle">
+              <h3><strong>Paystack Index</strong> = live commerce data</h3>
+              <p>Search vendors, read menus, connect a merchant account, preview an order, place an approved order, and track delivery through the upstream MCP.</p>
+            </article>
+            <article class="principle">
+              <h3><strong>Chowdeck adapter</strong> = agent-friendly contract</h3>
+              <p>Normalize Index responses, enforce safe sequencing, select only the relevant records, and attach a UI template when the user needs to decide or act.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="flow" aria-labelledby="flow-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">The request lifecycle</div>
+              <h2 id="flow-title">One conversation, several small surfaces.</h2>
+            </div>
+            <p>The agent does not dump the catalogue. It moves from evidence to a deliberate next step.</p>
+          </div>
+          <div class="flow">
+            <article class="flow-step">
+              <span class="flow-number">1</span>
+              <h3>Orient</h3>
+              <p>Start with <code>browse_merchants</code>; use <code>get_balance</code> or <code>get_recent_activity</code> when money or history matters.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">2</span>
+              <h3>Link &amp; discover</h3>
+              <p>Call <code>connect_merchant</code> if needed, then use <code>find_items</code> for a vendor or catalog.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">3</span>
+              <h3>Buy</h3>
+              <p>Use <code>quick_buy</code> for featured categories or <code>order</code> for a long-tail merchant.</p>
+            </article>
+            <article class="flow-step">
+              <span class="flow-number">4</span>
+              <h3>Approve &amp; monitor</h3>
+              <p>Use <code>request_transfer_approval</code> for bank transfers and <code>track_order</code> after a purchase.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="index-tools" aria-labelledby="index-tools-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">Layer 01</div>
+              <h2 id="index-tools-title">Every Paystack Index tool</h2>
+            </div>
+            <p>This is the complete catalog returned by the live Index MCP connection: nine tools, arranged in the order an agent typically reaches for them. Payloads are representative shapes with example IDs and values.</p>
+          </div>
+
+          <div class="tool-grid full-index-grid">
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>browse_merchants</code></h3><p>See which merchant capabilities are available.</p></div>
+                <span class="tag">start here</span>
+              </div>
+              <details open>
+                <summary>Directory call</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="browse-merchants-call">Copy</button>
+                  <pre id="browse-merchants-call"><code>{
+  "category": "food",
+  "include_coming_soon": false
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Representative response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="browse-merchants-response">Copy</button>
+                  <pre id="browse-merchants-response"><code>{
+  "merchants": [
+    {
+      "id": "chowdeck",
+      "name": "Chowdeck",
+      "category": "food",
+      "status": "live",
+      "featured": true,
+      "requires_link": true
+    }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">Use this for “what can I do here?” or before choosing a long-tail merchant.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>get_balance</code></h3><p>Read Index credits and linked Zap balance.</p></div>
+                <span class="tag">read-only</span>
+              </div>
+              <details open>
+                <summary>Balance call</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="get-balance-call">Copy</button>
+                  <pre id="get-balance-call"><code>{}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Representative response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="get-balance-response">Copy</button>
+                  <pre id="get-balance-response"><code>{
+  "balance_kobo": 0,
+  "zap_linked": true,
+  "zap_balance_kobo": 250000
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">Keep “Index credits,” “Zap balance,” and “Chowdeck wallet” as separate balances.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>get_recent_activity</code></h3><p>Read Index or Zap transaction history.</p></div>
+                <span class="tag">read-only</span>
+              </div>
+              <details open>
+                <summary>Zap spend query</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="activity-call">Copy</button>
+                  <pre id="activity-call"><code>{
+  "source": "zap",
+  "type": "debit",
+  "start_date": "2026-08-01",
+  "end_date": "2026-08-01",
+  "limit": 100
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Representative response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="activity-response">Copy</button>
+                  <pre id="activity-response"><code>{
+  "source": "zap",
+  "total_debit_naira": 4500,
+  "total_credit_naira": 0,
+  "transactions": [],
+  "totals_partial": false
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">Use date ranges for spend questions; the tool aggregates the window for you.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>connect_merchant</code></h3><p>Link a merchant account with phone + OTP.</p></div>
+                <span class="tag action">account action</span>
+              </div>
+              <details open>
+                <summary>Start connection</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="connect-call">Copy</button>
+                  <pre id="connect-call"><code>{
+  "merchant_id": "chowdeck",
+  "phone": "+2348012345678"
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>OTP-required response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="connect-response">Copy</button>
+                  <pre id="connect-response"><code>{
+  "connected": false,
+  "status": "otp_required",
+  "message": "Enter the OTP sent to your phone."
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">For Chowdeck, call again with the same phone and the OTP the user received.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>find_items</code></h3><p>Find restaurants or read one vendor’s menu.</p></div>
+                <span class="tag">read-only</span>
+              </div>
+              <details open>
+                <summary>Restaurant discovery call</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="find-items-call">Copy</button>
+                  <pre id="find-items-call"><code>{
+  "merchant_id": "chowdeck",
+  "query": "pizza",
+  "address_id": 107195,
+  "limit": 16
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Representative response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="find-items-response">Copy</button>
+                  <pre id="find-items-response"><code>{
+  "address_used": "Alexander House, Alausa, Lagos",
+  "address_id_used": 107195,
+  "open_count": 12,
+  "results": [
+    {
+      "vendor_id": 200481,
+      "vendor_name": "Dodo Pizza - Alausa",
+      "distance_km": 1.29,
+      "rating": 4.16,
+      "eta_minutes": 33,
+      "delivery_fee_naira": 650,
+      "is_open": true
+    }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">With <code>vendor_id</code> instead of a search query, the same upstream primitive returns categories and menu items.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>quick_buy</code></h3><p>Common purchases: airtime, data, electricity, and food.</p></div>
+                <span class="tag action">branched flow</span>
+              </div>
+              <details open>
+                <summary>Chowdeck food preview</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="quick-buy-call">Copy</button>
+                  <pre id="quick-buy-call"><code>{
+  "category": "food",
+  "vendor_id": 200481,
+  "items": [
+    { "menu_id": 8801, "quantity": 1 }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Needs-options response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="quick-buy-response">Copy</button>
+                  <pre id="quick-buy-response"><code>{
+  "status": "needs_options",
+  "items_needing_options": [
+    {
+      "menu_group_id": "size",
+      "options": [{ "item_id": 8802, "name": "Medium" }]
+    }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">Airtime is one-step; data and electricity are two-step; food can be options → preview → confirm.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>order</code></h3><p>Preview a basket, then place it only after approval.</p></div>
+                <span class="tag action">two-step</span>
+              </div>
+              <details open>
+                <summary>Preview request</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="order-preview-call">Copy</button>
+                  <pre id="order-preview-call"><code>{
+  "category": "food",
+  "merchant_id": "chowdeck",
+  "vendor_id": 200481,
+  "address_id": 107195,
+  "items": [
+    { "item_id": 8801, "quantity": 1 },
+    { "item_id": 8808, "quantity": 2 }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Preview response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="order-preview-response">Copy</button>
+                  <pre id="order-preview-response"><code>{
+  "status": "needs_confirmation",
+  "needs_confirmation": true,
+  "subtotal_naira": 18400,
+  "delivery_fee_naira": 650,
+  "total_naira": 19050,
+  "required_options": []
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">The adapter stores a short-lived preview token. A preview never charges the user.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>request_transfer_approval</code></h3><p>Preview and gate a bank transfer through Zap.</p></div>
+                <span class="tag action">approval gate</span>
+              </div>
+              <details open>
+                <summary>Recipient preview</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="transfer-call">Copy</button>
+                  <pre id="transfer-call"><code>{
+  "bank_code": "058",
+  "account_number": "0123456789",
+  "amount_naira": 5000,
+  "reason": "Lunch"
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Resolved-recipient response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="transfer-response">Copy</button>
+                  <pre id="transfer-response"><code>{
+  "status": "needs_confirmation",
+  "recipient_name": "Example Recipient",
+  "amount_naira": 5000,
+  "zap_balance_after_naira": 12400,
+  "approval_token": "one-time-token"
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">The confirm call sends only <code>confirmed: true</code> plus the one-time approval token.</p>
+            </article>
+
+            <article class="tool-card">
+              <div class="tool-card-head">
+                <div><h3><code>track_order</code></h3><p>Read the latest status for an existing order.</p></div>
+                <span class="tag">read-only</span>
+              </div>
+              <details open>
+                <summary>Tracking call</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="track-call">Copy</button>
+                  <pre id="track-call"><code>{
+  "merchant_id": "chowdeck",
+  "order_id": "CD-2026-00421"
+}</code></pre>
+                </div>
+              </details>
+              <details>
+                <summary>Representative response</summary>
+                <div class="code-wrap">
+                  <button class="copy" data-copy="track-response">Copy</button>
+                  <pre id="track-response"><code>{
+  "order_id": "CD-2026-00421",
+  "status": "out_for_delivery",
+  "vendor_name": "Dodo Pizza - Alausa",
+  "eta_minutes": 18,
+  "timeline": [
+    { "label": "Order accepted", "done": true },
+    { "label": "Preparing", "done": true },
+    { "label": "Out for delivery", "done": true }
+  ]
+}</code></pre>
+                </div>
+              </details>
+              <p class="note">The UI turns this into a compact delivery timeline instead of repeating a raw status object.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="adapter-tools" aria-labelledby="adapter-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">Layer 02</div>
+              <h2 id="adapter-title">The Chowdeck adapter contract</h2>
+            </div>
+            <p>This is our narrower Chowdeck wrapper. The nine cards above are the full upstream Index catalog; these adapter tools add normalization, sequencing, and UI only where it helps.</p>
+          </div>
+          <div class="adapter-table-wrap">
+            <table>
+              <thead><tr><th>Tool</th><th>What it does</th><th>What comes back</th></tr></thead>
+              <tbody>
+                <tr><td><code>chowdeck_browse</code></td><td>Calls Index <code>find_items</code> for nearby restaurant candidates.</td><td><code>view: "browse"</code> + normalized restaurants. <strong>No UI template.</strong></td></tr>
+                <tr><td><code>chowdeck_render_recommendations</code></td><td>Re-fetches live data and keeps only the agent’s best 1–5 vendor IDs.</td><td><code>view: "recommendations"</code> + restaurant cards + UI template.</td></tr>
+                <tr><td><code>chowdeck_menu</code></td><td>Calls Index <code>find_items</code> for the selected vendor.</td><td><code>view: "menu"</code> + normalized categories and items.</td></tr>
+                <tr><td><code>chowdeck_render_menu_picks</code></td><td>Re-fetches the menu and keeps only 1–8 matching item IDs.</td><td><code>view: "menu-picks"</code> + focused item cards + UI template.</td></tr>
+                <tr><td><code>chowdeck_connect</code></td><td>Starts the phone flow or submits the OTP.</td><td><code>view: "connect"</code> with <code>stage: "otp"</code> or <code>"connected"</code>.</td></tr>
+                <tr><td><code>chowdeck_preview_order</code></td><td>Calls Index <code>order</code> without confirmation.</td><td><code>view: "options"</code>, <code>"preview"</code>, or <code>"confirm"</code>; never charges.</td></tr>
+                <tr><td><code>chowdeck_confirm_order</code></td><td>Consumes the one-time preview token and sends <code>confirmed: true</code>.</td><td><code>view: "tracking"</code> after the upstream order is placed.</td></tr>
+                <tr><td><code>chowdeck_track_order</code></td><td>Calls Index <code>track_order</code> for an existing order.</td><td><code>view: "tracking"</code> + normalized order status.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" id="ui" aria-labelledby="ui-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">Layer 03</div>
+              <h2 id="ui-title">Where the UI comes in</h2>
+            </div>
+            <p>The UI is not a second Chowdeck website. It is a small surface attached to the exact tool result that needs a human decision.</p>
+          </div>
+          <div class="ui-section">
+            <article class="ui-card">
+              <h3>One widget, many focused views.</h3>
+              <p>The same app composes a different surface as the agent advances the task.</p>
+              <ol class="ui-list">
+                <li><b>1</b><span><code>chowdeck_render_recommendations</code> → restaurant decision cards.</span></li>
+                <li><b>2</b><span><code>chowdeck_menu</code> → the selected vendor’s menu data.</span></li>
+                <li><b>3</b><span><code>chowdeck_render_menu_picks</code> → only the items matching “under ₦10,000”.</span></li>
+                <li><b>4</b><span><code>chowdeck_preview_order</code> → basket, options, delivery fee, and total.</span></li>
+                <li><b>5</b><span><code>chowdeck_connect</code> → phone and OTP in a focused panel.</span></li>
+                <li><b>6</b><span><code>chowdeck_track_order</code> → delivery timeline, not raw JSON.</span></li>
+              </ol>
+            </article>
+            <article class="ui-card code-panel">
+              <div class="panel-head"><span>Render metadata</span><span>index-v12</span></div>
+              <pre><code><span class="dim">// Data-only tools omit this metadata.</span>
+registerAppTool(server,
+  <span class="accent">"chowdeck_render_recommendations"</span>,
+  {
+    _meta: {
+      ui: {
+        resourceUri:
+          <span class="accent">"ui://chowdeck/index-v12.html"</span>
+      },
+      <span class="accent">"openai/outputTemplate"</span>:
+        <span class="accent">"ui://chowdeck/index-v12.html"</span>,
+      <span class="accent">"openai/widgetAccessible"</span>: true
+    }
+  }
+);
+
+<span class="dim">// The widget can compose the next step:</span>
+await window.openai.callTool(
+  <span class="accent">"chowdeck_menu"</span>,
+  { vendorId: <span class="accent">"200481"</span> }
+);</code></pre>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="safety" aria-labelledby="rules-title">
+          <div class="section-heading">
+            <div>
+              <div class="kicker">Guardrails</div>
+              <h2 id="rules-title">The rules that keep the flow useful.</h2>
+            </div>
+            <p>These are the practical boundaries encoded in the adapter instructions and tool annotations.</p>
+          </div>
+          <div class="rules">
+            <article class="rule"><h3>Browse before render</h3><p>Use live data to choose the shortlist. Never invent cards in the UI.</p></article>
+            <article class="rule"><h3>Keep it small</h3><p>Render 1–5 restaurants or 1–8 menu items, not the whole catalogue.</p></article>
+            <article class="rule"><h3>Preview before place</h3><p>Show options and the exact total before any confirmation-capable call.</p></article>
+            <article class="rule"><h3>OTP stays in UI</h3><p>Keep connection details in the focused panel, not in a sprawling transcript.</p></article>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <strong>Chowdeck UI on Paystack Index</strong>
+        <span>Independent adapter · representative payloads · no credentials or real order data included</span>
+      </footer>
+    </div>
+
+    <script>
+      document.querySelectorAll("[data-copy]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const source = document.getElementById(button.dataset.copy);
+          if (!source) return;
+          const value = source.innerText;
+          try {
+            await navigator.clipboard.writeText(value);
+            const label = button.textContent;
+            button.textContent = "Copied";
+            setTimeout(() => { button.textContent = label; }, 1200);
+          } catch {
+            button.textContent = "Select to copy";
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

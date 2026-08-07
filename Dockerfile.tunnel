@@ -1,0 +1,18 @@
+FROM alpine:3.22
+
+ARG TUNNEL_CLIENT_VERSION=v0.0.10
+ARG TARGET_ARCH=linux-amd64
+
+RUN apk add --no-cache ca-certificates curl unzip \
+    && archive="tunnel-client-${TUNNEL_CLIENT_VERSION}-${TARGET_ARCH}.zip" \
+    && base_url="https://github.com/openai/tunnel-client/releases/download/${TUNNEL_CLIENT_VERSION}" \
+    && curl -fsSL "${base_url}/${archive}" -o "/tmp/${archive}" \
+    && curl -fsSL "${base_url}/SHA256SUMS.txt" -o /tmp/SHA256SUMS.txt \
+    && cd /tmp \
+    && grep " ${archive}$" SHA256SUMS.txt | sha256sum -c - \
+    && unzip "${archive}" \
+    && install -m 0755 tunnel-client /usr/local/bin/tunnel-client \
+    && rm -rf "/tmp/${archive}" /tmp/SHA256SUMS.txt /tmp/tunnel-client
+
+ENTRYPOINT ["tunnel-client"]
+

@@ -1,0 +1,18 @@
+services:
+  app:
+    restart: unless-stopped
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      PAYSTACK_INDEX_CLIENT_ID: ${PAYSTACK_INDEX_CLIENT_ID:-}
+      PAYSTACK_INDEX_CLIENT_SECRET: ${PAYSTACK_INDEX_CLIENT_SECRET:-}
+      PAYSTACK_INDEX_MCP_URL: ${PAYSTACK_INDEX_MCP_URL:-https://mcp.paystack.africa/mcp}
+      PAYSTACK_INDEX_TOKEN_URL: ${PAYSTACK_INDEX_TOKEN_URL:-https://mcp.paystack.africa/oauth/token}
+    ports:
+      - "8787:8787"
