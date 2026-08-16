@@ -1,6 +1,13 @@
 # Chowdeck UI on Paystack Index
 
-A private MCP App that turns Paystack Index’s Chowdeck tools into an agent-led ordering experience: the agent narrows live restaurant data into a small visual shortlist, then composes the right surface for the next decision — restaurant cards, filtered menu-item cards, basket, approval, OTP, or tracking — as the user moves through the task.
+Paystack Index makes it possible to order from services like Chowdeck through
+ChatGPT and other agent hosts. I wanted to see what I was actually ordering —
+not just read a list of items in chat — so I built this focused, composable UI
+layer on top of it.
+
+The agent narrows live restaurant data into a small visual shortlist, then
+composes the right surface for the next decision: restaurant cards, filtered
+menu-item cards, basket, approval, OTP, or tracking.
 
 This is an independent interface powered by Paystack Index and Chowdeck. It is not an official Chowdeck client.
 
