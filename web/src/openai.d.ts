@@ -5,6 +5,8 @@ declare global {
     openai?: {
       toolOutput?: Record<string, unknown>;
       toolInput?: Record<string, unknown>;
+      widgetState?: Record<string, unknown>;
+      setWidgetState?: (state: Record<string, unknown>) => void;
       callTool: (
         name: string,
         args: Record<string, unknown>
@@ -21,8 +23,8 @@ declare global {
       globals?: {
         toolOutput?: Record<string, unknown>;
         toolInput?: Record<string, unknown>;
+        widgetState?: Record<string, unknown>;
       };
     }>;
   }
 }
-

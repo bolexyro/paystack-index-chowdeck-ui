@@ -1,7 +1,6 @@
 export const mockBrowse = {
   view: "recommendations",
   title: "A few good options",
-  subtitle: "I picked a short list for you. Choose one to open its menu.",
   address: "Lekki Phase 1, Lagos",
   openCount: 12,
   restaurants: [

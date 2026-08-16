@@ -21,6 +21,7 @@ import { PreviewStore } from "./preview-store.js";
 import type { UnknownRecord } from "./types.js";
 
 const WIDGET_URIS = [
+  "ui://chowdeck/index-v19.html",
   "ui://chowdeck/index-v12.html",
   "ui://chowdeck/index-v9.html",
   "ui://chowdeck/index-v8.html",
@@ -54,22 +55,26 @@ function toolMeta() {
 }
 
 function success(data: UnknownRecord, message: string) {
+  const widgetSessionId = randomUUID();
   return {
-    structuredContent: data,
-    content: [{ type: "text" as const, text: message }]
+    structuredContent: { ...data, widgetSessionId },
+    content: [{ type: "text" as const, text: message }],
+    _meta: { "openai/widgetSessionId": widgetSessionId }
   };
 }
 
 function errorResult(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected error";
+  const widgetSessionId = randomUUID();
   // Keep expected upstream/business failures in the app state rather than
   // marking the MCP call as a transport error. ChatGPT's widget host turns
   // `isError: true` into a generic banner, which hides actionable details
   // such as an insufficient wallet balance. The typed error view still
   // prevents confirmation because it contains no confirmation token.
   return {
-    structuredContent: { view: "error", error: true, message },
-    content: [{ type: "text" as const, text: message }]
+    structuredContent: { view: "error", error: true, message, widgetSessionId },
+    content: [{ type: "text" as const, text: message }],
+    _meta: { "openai/widgetSessionId": widgetSessionId }
   };
 }
 
@@ -89,22 +94,28 @@ async function readWidgetResource(uri: string) {
   const htmlPath = path.join(root, "web", "dist", "index.html");
   const jsPath = path.join(root, "web", "dist", "widget.js");
   const cssPath = path.join(root, "web", "dist", "widget.css");
-  const [shell, js, css] = await Promise.all([
+  const logoPath = path.join(root, "web", "dist", "chowdeck-logo.svg");
+  const [shell, js, css, logo] = await Promise.all([
     readFile(htmlPath, "utf8"),
     readFile(jsPath, "utf8"),
-    readFile(cssPath, "utf8").catch(() => "")
+    readFile(cssPath, "utf8").catch(() => ""),
+    readFile(logoPath, "utf8").catch(() => "")
   ]);
   // Inline bundles must not contain literal closing tags: the HTML parser
   // would terminate the element early and render the remaining JS as text.
   const inlineJs = js.replace(/<\/script/gi, "<\\/script");
   const inlineCss = css.replace(/<\/style/gi, "<\\/style");
+  const logoDataUrl = logo
+    ? `data:image/svg+xml;base64,${Buffer.from(logo, "utf8").toString("base64")}`
+    : "";
   const html = shell
     .replace(
       /<script[^>]+src="[^"]+"[^>]*><\/script>/,
       () =>
         `<style>${inlineCss}</style><script type="module">${inlineJs}</script>`
     )
-    .replace(/<link[^>]+stylesheet[^>]*>/g, "");
+    .replace(/<link[^>]+stylesheet[^>]*>/g, "")
+    .replace(/\/chowdeck-logo\.svg/g, logoDataUrl);
   return {
     contents: [
       {
@@ -179,6 +190,94 @@ async function findChowdeckRestaurants({
     assertUpstreamSuccess(payload);
   }
   return payload;
+}
+
+async function resolveChowdeckAddress(addressId?: string | number) {
+  const payload = await findChowdeckRestaurants({
+    addressId,
+    limit: 1
+  });
+  const resolvedAddressId =
+    typeof payload.address_id_used === "string" ||
+    typeof payload.address_id_used === "number"
+      ? payload.address_id_used
+      : addressId;
+  return {
+    address: payload.address_used,
+    addressId: resolvedAddressId
+  };
+}
+
+async function selectChowdeckRestaurants({
+  restaurantIds,
+  addressId
+}: {
+  restaurantIds: Array<string | number>;
+  addressId?: string | number;
+}) {
+  const payload = await findChowdeckRestaurants({
+    addressId,
+    limit: 24
+  });
+  const selectedIds = new Set(restaurantIds.map((id) => String(id)));
+  const nearby = normalizeRestaurants(payload).filter((restaurant) =>
+    selectedIds.has(restaurant.vendorId)
+  );
+  const nearbyById = new Map(nearby.map((restaurant) => [restaurant.vendorId, restaurant]));
+  const resolvedAddressId =
+    addressId ??
+    (typeof payload.address_id_used === "string" ||
+    typeof payload.address_id_used === "number"
+      ? payload.address_id_used
+      : undefined);
+
+  const missingIds = restaurantIds.filter((id) => !nearbyById.has(String(id)));
+  if (missingIds.length > 0) {
+    const fallbackRestaurants = await Promise.all(
+      missingIds.map(async (id) => {
+        const vendorPayload = unwrapToolPayload(
+          await indexClient.callTool("find_items", {
+            merchant_id: "chowdeck",
+            vendor_id: numericId(id),
+            ...(resolvedAddressId ? { address_id: numericId(resolvedAddressId) } : {})
+          })
+        );
+        assertUpstreamSuccess(vendorPayload);
+        const vendorName =
+          typeof vendorPayload.vendor_name === "string"
+            ? vendorPayload.vendor_name
+            : "Restaurant";
+
+        // A vendor-menu lookup is authoritative for the name/open state but
+        // does not include the card metadata (distance, rating, ETA, image).
+        // Search that exact vendor name once to hydrate a complete card.
+        const searchPayload = await findChowdeckRestaurants({
+          query: vendorName,
+          addressId: resolvedAddressId,
+          limit: 24
+        });
+        const hydrated = normalizeRestaurants(searchPayload).find(
+          (restaurant) => restaurant.vendorId === String(id)
+        );
+        return (
+          hydrated ?? {
+            vendorId: String(id),
+            name: vendorName,
+            isOpen: vendorPayload.is_open !== false
+          }
+        );
+      })
+    );
+    for (const restaurant of fallbackRestaurants) {
+      nearbyById.set(restaurant.vendorId, restaurant);
+    }
+  }
+
+  const restaurants = restaurantIds
+    .map((id) => nearbyById.get(String(id)))
+    .filter((restaurant): restaurant is NonNullable<typeof restaurant> => Boolean(restaurant));
+
+  return { payload, restaurants };
 }
 
 async function createServer() {
@@ -259,16 +358,12 @@ async function createServer() {
       annotations: { readOnlyHint: true, openWorldHint: true },
       _meta: toolMeta()
     },
-    async ({ restaurantIds, addressId, title, subtitle }) => {
+    async ({ restaurantIds, addressId, title }) => {
       try {
-        const payload = await findChowdeckRestaurants({
-          addressId,
-          limit: 20
+        const { payload, restaurants } = await selectChowdeckRestaurants({
+          restaurantIds,
+          addressId
         });
-        const selectedIds = new Set(restaurantIds.map((id) => String(id)));
-        const restaurants = normalizeRestaurants(payload).filter((restaurant) =>
-          selectedIds.has(restaurant.vendorId)
-        );
         if (!restaurants.length) {
           throw new Error(
             "Those Chowdeck options are no longer available. Find nearby options again."
@@ -280,9 +375,7 @@ async function createServer() {
           address: payload.address_used,
           addressId: payload.address_id_used,
           openCount: payload.open_count,
-          title: title ?? "A few good options",
-          subtitle:
-            subtitle ?? "I picked a short list for you. Choose one to open its menu."
+          title: title ?? "A few good options"
         }, `I’ve opened ${restaurants.length} selected Chowdeck options in a focused picker.`);
       } catch (error) {
         return errorResult(error);
@@ -368,11 +461,14 @@ async function createServer() {
     },
     async ({ vendorId, addressId }) => {
       try {
+        const addressContext = await resolveChowdeckAddress(addressId);
         const args: UnknownRecord = {
           merchant_id: "chowdeck",
           vendor_id: numericId(vendorId)
         };
-        if (addressId) args.address_id = numericId(addressId);
+        if (addressContext.addressId) {
+          args.address_id = numericId(addressContext.addressId);
+        }
         const payload = unwrapToolPayload(
           await indexClient.callTool("find_items", args)
         );
@@ -381,8 +477,8 @@ async function createServer() {
         return success({
           view: "menu",
           menu,
-          address: payload.address_used,
-          addressId: payload.address_id_used ?? addressId
+          address: payload.address_used ?? addressContext.address,
+          addressId: payload.address_id_used ?? addressContext.addressId
         }, `I’ve opened ${menu.vendorName}’s menu in the app.`);
       } catch (error) {
         return errorResult(error);
@@ -413,11 +509,14 @@ async function createServer() {
     },
     async ({ vendorId, itemIds, addressId, title, subtitle }) => {
       try {
+        const addressContext = await resolveChowdeckAddress(addressId);
         const args: UnknownRecord = {
           merchant_id: "chowdeck",
           vendor_id: numericId(vendorId)
         };
-        if (addressId) args.address_id = numericId(addressId);
+        if (addressContext.addressId) {
+          args.address_id = numericId(addressContext.addressId);
+        }
         const payload = unwrapToolPayload(
           await indexClient.callTool("find_items", args)
         );
@@ -438,8 +537,8 @@ async function createServer() {
           vendorName: menu.vendorName,
           isOpen: menu.isOpen,
           items,
-          address: payload.address_used,
-          addressId: payload.address_id_used ?? addressId,
+          address: payload.address_used ?? addressContext.address,
+          addressId: payload.address_id_used ?? addressContext.addressId,
           title: title ?? "Good picks under your budget",
           subtitle:
             subtitle ?? `A short list from ${menu.vendorName}'s menu.`
@@ -456,6 +555,15 @@ async function createServer() {
       quantity: z.number().int().min(1).max(20)
     })
   );
+  const modifierOptions = z.record(
+    z.array(
+      z.object({
+        menuGroupId: indexId,
+        itemId: indexId,
+        quantity: z.number().int().min(1).max(20).default(1)
+      })
+    )
+  );
 
   registerAppTool(
     server,
@@ -469,7 +577,7 @@ async function createServer() {
         items: orderItems.min(1),
         addressId: indexId.optional(),
         notes: z.string().max(500).optional(),
-        options: z.record(z.unknown()).optional()
+        options: modifierOptions.optional()
       },
       annotations: {
         readOnlyHint: false,
@@ -481,18 +589,30 @@ async function createServer() {
     },
     async ({ vendorId, items, addressId, notes, options }) => {
       try {
+        const upstreamItems = items.map((item) => {
+          const selections = options?.[String(item.itemId)];
+          return {
+            item_id: numericId(item.itemId),
+            quantity: item.quantity,
+            ...(selections?.length
+              ? {
+                  modifier_selections: selections.map((selection) => ({
+                    menu_group_id: numericId(selection.menuGroupId),
+                    item_id: numericId(selection.itemId),
+                    quantity: selection.quantity
+                  }))
+                }
+              : {})
+          };
+        });
         const args: UnknownRecord = {
           category: "food",
           merchant_id: "chowdeck",
           vendor_id: numericId(vendorId),
-          items: items.map((item) => ({
-            item_id: numericId(item.itemId),
-            quantity: item.quantity
-          }))
+          items: upstreamItems
         };
         if (addressId) args.address_id = numericId(addressId);
         if (notes) args.vendor_note = notes;
-        if (options) args.modifier_selections = options;
         const payload = unwrapToolPayload(
           await indexClient.callTool("order", args)
         );
@@ -504,9 +624,13 @@ async function createServer() {
           const confirmation = previews.create(args, payload);
           return success({
             view: "confirm",
+            vendorId: String(vendorId),
+            items,
             preview: payload,
             confirmationToken: confirmation.token,
-            confirmationExpiresAt: confirmation.expiresAt
+            confirmationExpiresAt: confirmation.expiresAt,
+            address: payload.address_used,
+            addressId: payload.address_id_used ?? addressId
           }, "Your order review is ready in the app. Nothing has been charged.");
         }
         return success({
@@ -514,7 +638,11 @@ async function createServer() {
             payload.needs_options === true || payload.status === "needs_options"
               ? "options"
               : "preview",
-          preview: payload
+          vendorId: String(vendorId),
+          items,
+          preview: payload,
+          address: payload.address_used,
+          addressId: payload.address_id_used ?? addressId
         }, "The selected basket is ready for review in the app.");
       } catch (error) {
         return errorResult(error);

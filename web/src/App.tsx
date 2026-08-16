@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { mockBrowse, mockMenu, mockMenuPicks } from "./mock";
 
 type AnyRecord = Record<string, any>;
@@ -8,6 +8,11 @@ type CartContext = {
   addressId?: string | number;
 };
 type CartLine = CartContext & { item: AnyRecord; quantity: number };
+type ModifierSelection = {
+  menuGroupId: string | number;
+  itemId: string | number;
+  quantity: number;
+};
 
 function formatAddress(address: unknown) {
   if (typeof address === "string" && address.trim()) return address;
@@ -24,6 +29,85 @@ function formatAddress(address: unknown) {
   return "Your saved address";
 }
 
+function hasMeaningfulAddress(address: unknown) {
+  if (typeof address === "string") return address.trim().length > 0;
+  if (!address || typeof address !== "object") return false;
+  const value = address as AnyRecord;
+  return [value.pretty_name, value.city, value.state].some(
+    (part) => typeof part === "string" && part.trim().length > 0
+  );
+}
+
+function hasValue(value: unknown) {
+  return value !== undefined && value !== null && value !== "";
+}
+
+function mergeToolOutput(previous: AnyRecord, next: AnyRecord) {
+  const merged = { ...previous, ...next };
+  if (!hasMeaningfulAddress(next.address) && hasMeaningfulAddress(previous.address)) {
+    merged.address = previous.address;
+  }
+  if (!hasValue(next.addressId) && hasValue(previous.addressId)) {
+    merged.addressId = previous.addressId;
+  }
+  return merged;
+}
+
+const OUTPUT_STORAGE_KEY = "chowdeck-ui:last-output";
+
+function readStoredOutput(expectedTitle?: unknown) {
+  try {
+    const raw = window.localStorage.getItem(OUTPUT_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as AnyRecord;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    if (
+      typeof expectedTitle === "string" &&
+      typeof parsed.title === "string" &&
+      parsed.title !== expectedTitle
+    ) {
+      return undefined;
+    }
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
+function outputForStorage(output: AnyRecord) {
+  // Preview/confirmation handles are single-use capabilities. Keep the
+  // browse/menu surface across a reload, but never persist an order token.
+  const {
+    confirmationToken: _confirmationToken,
+    approvalToken: _approvalToken,
+    paymentToken: _paymentToken,
+    ...safeOutput
+  } = output;
+  return safeOutput;
+}
+
+function widgetOutput(state: unknown) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return undefined;
+  const value = state as AnyRecord;
+  return value.toolOutput && typeof value.toolOutput === "object"
+    ? value.toolOutput
+    : value;
+}
+
+function hasRenderableData(output: AnyRecord | undefined) {
+  if (!output) return false;
+  return [
+    "restaurants",
+    "items",
+    "menu",
+    "order",
+    "preview",
+    "message",
+    "linked",
+    "stage"
+  ].some((key) => key in output);
+}
+
 const naira = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -31,12 +115,42 @@ const naira = new Intl.NumberFormat("en-NG", {
 });
 
 function useToolOutput() {
-  const [output, setOutput] = useState<AnyRecord>(
-    () => window.openai ? (window.openai.toolOutput ?? { view: "idle" }) : mockBrowse
-  );
+  const [output, setOutputState] = useState<AnyRecord>(() => {
+    const hostOutput = window.openai?.toolOutput;
+    const stateOutput = widgetOutput(window.openai?.widgetState);
+    const stored = readStoredOutput(hostOutput?.title ?? stateOutput?.title);
+    const remembered = mergeToolOutput(stored ?? {}, stateOutput ?? {});
+    if (hasRenderableData(hostOutput)) return mergeToolOutput(remembered, hostOutput);
+    if (hostOutput) return mergeToolOutput(remembered, hostOutput);
+    return remembered.view ? remembered : (window.openai ? { view: "idle" } : mockBrowse);
+  });
+  const setOutput = (next: AnyRecord) =>
+    setOutputState((current) => mergeToolOutput(current, next));
+  const lastWidgetState = useRef("");
+  useEffect(() => {
+    const safeOutput = outputForStorage(output);
+    try {
+      window.localStorage.setItem(OUTPUT_STORAGE_KEY, JSON.stringify(safeOutput));
+    } catch {
+      // Storage is best-effort in embedded hosts.
+    }
+    const setWidgetState = window.openai?.setWidgetState;
+    if (setWidgetState) {
+      try {
+        const serialized = JSON.stringify(safeOutput);
+        if (serialized !== lastWidgetState.current) {
+          lastWidgetState.current = serialized;
+          setWidgetState({ toolOutput: safeOutput });
+        }
+      } catch {
+        // Host state is best-effort in non-Apps-SDK previews.
+      }
+    }
+  }, [output]);
   useEffect(() => {
     const handler = (event: WindowEventMap["openai:set_globals"]) => {
-      const next = event.detail?.globals?.toolOutput;
+      const globals = event.detail?.globals;
+      const next = globals?.toolOutput ?? widgetOutput(globals?.widgetState);
       if (next) setOutput(next);
     };
     window.addEventListener("openai:set_globals", handler);
@@ -64,8 +178,7 @@ async function callTool(name: string, args: AnyRecord) {
       return {
         ...mockBrowse,
         view: "recommendations",
-        title: "A few good options",
-        subtitle: "I picked a short list for you. Choose one to open its menu."
+        title: "A few good options"
       };
     }
     if (name === "chowdeck_browse") return mockBrowse;
@@ -140,10 +253,14 @@ function ImageWithFallback({
   return <img src={src} alt={alt} onError={() => setFailed(true)} />;
 }
 
-function compactAddress(address: unknown) {
-  const value = formatAddress(address);
-  const parts = value.split(",").map((part) => part.trim()).filter(Boolean);
-  return parts.slice(0, 2).join(", ") || value;
+function LoadingOverlay() {
+  return (
+    <div className="loading-scrim" role="status" aria-live="polite">
+      <span className="apple-spinner" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, index) => <i key={index} />)}
+      </span>
+    </div>
+  );
 }
 
 function RecommendationSurface({
@@ -167,20 +284,11 @@ function RecommendationSurface({
     .filter((restaurant: AnyRecord) => restaurant.isOpen === false)
     .slice(0, 4);
   const title = typeof output.title === "string" ? output.title : "A few good options";
-  const subtitle =
-    typeof output.subtitle === "string"
-      ? output.subtitle
-      : "I picked a short list for you. Choose one to open its menu.";
 
   return (
     <section className="recommendation-view" aria-labelledby="recommendation-title">
       <div className="recommendation-intro">
-        <div className="agent-kicker">
-          <span className="agent-kicker-mark">✦</span>
-          <span>Picked for you by Chowdeck on Index</span>
-        </div>
         <h1 id="recommendation-title">{title}</h1>
-        <p>{subtitle}</p>
       </div>
 
       <form
@@ -200,11 +308,6 @@ function RecommendationSurface({
         />
         <button type="submit" disabled={busy || !query.trim()}>Search</button>
       </form>
-
-      <div className="recommendation-context" aria-label="Recommendation context">
-        <span><Icon name="pin" /> {compactAddress(output.address)}</span>
-        <span>{restaurants.length} {restaurants.length === 1 ? "pick" : "picks"}</span>
-      </div>
 
       {restaurants.length > 0 ? (
         <div className="recommendation-list">
@@ -284,6 +387,8 @@ function MenuPicksSurface({
 }) {
   const items = (Array.isArray(output.items) ? output.items : []).slice(0, 8);
   const vendorName = typeof output.vendorName === "string" ? output.vendorName : "Chowdeck menu";
+  const vendorLogo = [output.vendorLogoUrl, output.vendorImageUrl, output.logoUrl]
+    .find((value) => typeof value === "string" && value.trim());
   const title = typeof output.title === "string" ? output.title : "Good picks under your budget";
   const subtitle =
     typeof output.subtitle === "string"
@@ -297,6 +402,21 @@ function MenuPicksSurface({
       <button className="back" onClick={onBack} aria-label="Back to full menu" title="Back to full menu">
         <Icon name="back" /> <span>Menu</span>
       </button>
+
+      <div className="menu-picks-venue" aria-label={`Ordering from ${vendorName}`}>
+        <span className="menu-picks-venue-mark">
+          {vendorLogo ? (
+            <ImageWithFallback src={vendorLogo} alt={`${vendorName} logo`} fallback={vendorInitials(vendorName)} />
+          ) : (
+            vendorInitials(vendorName)
+          )}
+        </span>
+        <span className="menu-picks-venue-copy">
+          <small>Ordering from</small>
+          <strong>{vendorName}</strong>
+        </span>
+        <span className="menu-picks-venue-status">Live menu</span>
+      </div>
 
       <div className="menu-picks-title">
         <p className="eyebrow">{vendorName}</p>
@@ -352,6 +472,15 @@ function MenuPicksSurface({
       )}
     </section>
   );
+}
+
+function vendorInitials(name: string) {
+  const words = name
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return (words.slice(0, 2).map((word) => word[0]).join("") || "C").toUpperCase();
 }
 
 export default function App() {
@@ -418,7 +547,7 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" aria-busy={busy}>
       <header className="topbar">
         <button
           className="location"
@@ -433,8 +562,9 @@ export default function App() {
           <span className="chevron">⌄</span>
         </button>
         <button className="wordmark" onClick={() => setConnectOpen(true)} aria-label="Connect Chowdeck">
-          <i>c</i>
-          <span>chowdeck</span>
+          <span className="wordmark-lockup">
+            <img src="/chowdeck-logo.svg" alt="Chowdeck" />
+          </span>
           <em>on Index</em>
         </button>
         <button
@@ -449,7 +579,7 @@ export default function App() {
       </header>
 
       {error && <div className="error-banner">{error}</div>}
-      {busy && <div className="loading-bar" />}
+      {busy && <LoadingOverlay />}
 
       {view === "idle" && <IdleSurface />}
 
@@ -553,7 +683,30 @@ export default function App() {
         <Confirmation
           output={output}
           busy={busy}
-          onBack={() => setOutput(mockMenu)}
+          onBack={() => {
+            const vendorId = output.vendorId ?? cartContext?.vendorId;
+            if (vendorId) {
+              invoke("chowdeck_menu", {
+                vendorId,
+                addressId: output.addressId ?? cartContext?.addressId
+              });
+            } else {
+              setOutput(mockMenu);
+            }
+          }}
+          onOptionsSubmit={(options) =>
+            invoke("chowdeck_preview_order", {
+              vendorId: cartContext?.vendorId ?? output.vendorId ?? mockMenu.menu.vendorId,
+              addressId: cartContext?.addressId ?? output.addressId,
+              items: cart.length
+                ? cart.map((line) => ({
+                    itemId: String(line.item.itemId),
+                    quantity: line.quantity
+                  }))
+                : output.items ?? [],
+              options
+            })
+          }
           onConfirm={() =>
             invoke("chowdeck_confirm_order", {
               confirmationToken: output.confirmationToken,
@@ -703,7 +856,9 @@ function ConnectSheet({
           </div>
         ) : (
           <>
-            <span className="connect-mark">c</span>
+            <span className="connect-mark connect-logo">
+              <img src="/chowdeck-logo.svg" alt="Chowdeck" />
+            </span>
             <p className="eyebrow">
               {stage === "otp" ? "Check your phone" : "One-time setup"}
             </p>
@@ -820,14 +975,24 @@ function CartDrawer({
   onClear: () => void;
   onCheckout: () => void;
 }) {
+  const itemCount = cart.reduce((count, line) => count + line.quantity, 0);
+
   return (
     <div className="scrim" onMouseDown={onClose}>
       <aside className="drawer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="drawer-head">
           <div>
-            <p className="eyebrow">Your order</p>
+            <div className="drawer-kicker">
+              <p className="eyebrow">Your order</p>
+              {cart.length > 0 && <span>{itemCount} {itemCount === 1 ? "item" : "items"}</span>}
+            </div>
             <h2>Basket</h2>
-            {vendorName && <span className="drawer-vendor">{vendorName}</span>}
+            {vendorName && (
+              <span className="drawer-vendor">
+                <Icon name="bag" />
+                <span>{vendorName}</span>
+              </span>
+            )}
           </div>
           <button onClick={onClose} aria-label="Close basket">×</button>
         </div>
@@ -835,9 +1000,17 @@ function CartDrawer({
           <div className="cart-lines">
             {cart.map((line) => (
               <div className="cart-line" key={line.item.itemId}>
-                <div>
+                <div className="cart-line-media">
+                  <ImageWithFallback
+                    src={line.item.imageUrl}
+                    alt={`${line.item.name} image`}
+                    fallback="🍽️"
+                  />
+                </div>
+                <div className="cart-line-copy">
                   <strong>{line.item.name}</strong>
                   <span>{naira.format(Number(line.item.priceNaira ?? 0))} each</span>
+                  <b>{naira.format(Number(line.item.priceNaira ?? 0) * line.quantity)}</b>
                 </div>
                 <div className="stepper">
                   <button
@@ -860,12 +1033,18 @@ function CartDrawer({
             <p>Pick a restaurant, then add something you like.</p>
           </div>
         )}
-        <div className="drawer-total"><span>Items total</span><strong>{naira.format(total)}</strong></div>
-        <p className="fee-note">Delivery and service fees appear before you approve payment.</p>
-        {cart.length > 0 && <button className="text-button clear-basket" onClick={onClear}>Clear basket</button>}
-        <button className="primary" disabled={busy || !cart.length} onClick={onCheckout}>
-          Review order
-        </button>
+        <div className="drawer-summary">
+          <div className="drawer-summary-head">
+            <span>Order summary</span>
+            {cart.length > 0 && <button className="text-button clear-basket" onClick={onClear}>Clear basket</button>}
+          </div>
+          <div className="drawer-total"><span>Items total</span><strong>{naira.format(total)}</strong></div>
+          <p className="fee-note">Delivery and service fees are calculated before you approve payment.</p>
+          <button className="primary" disabled={busy || !cart.length} onClick={onCheckout}>
+            Review order
+            {cart.length > 0 && <span>{naira.format(total)}</span>}
+          </button>
+        </div>
       </aside>
     </div>
   );
@@ -908,26 +1087,23 @@ function Confirmation({
   output,
   busy,
   onBack,
+  onOptionsSubmit,
   onConfirm
 }: {
   output: AnyRecord;
   busy: boolean;
   onBack: () => void;
+  onOptionsSubmit: (options: Record<string, ModifierSelection[]>) => void;
   onConfirm: () => void;
 }) {
   const preview = output.preview ?? {};
   if (output.view === "options") {
-    return (
-      <section className="confirm-page">
-        <button className="back" onClick={onBack}><Icon name="back" /> Back to menu</button>
-        <div className="confirm-card">
-          <p className="eyebrow">One more choice</p>
-          <h1>Customise your meal</h1>
-          <p className="muted">This restaurant requires options for one or more items. The live option groups will appear here.</p>
-          <pre>{JSON.stringify(preview.options ?? preview, null, 2)}</pre>
-        </div>
-      </section>
-    );
+    const itemsNeedingOptions = Array.isArray(preview.items_needing_options)
+      ? preview.items_needing_options
+      : Array.isArray(preview.options?.items_needing_options)
+        ? preview.options.items_needing_options
+        : [];
+    return <OptionsStep items={itemsNeedingOptions} busy={busy} onBack={onBack} onSubmit={onOptionsSubmit} />;
   }
   return (
     <section className="confirm-page">
@@ -951,6 +1127,143 @@ function Confirmation({
           {busy ? "Placing order…" : "Place order and pay"}
         </button>
         <small className="legal">By continuing, you approve this exact total. The approval expires in 10 minutes.</small>
+      </div>
+    </section>
+  );
+}
+
+function OptionsStep({
+  items,
+  busy,
+  onBack,
+  onSubmit
+}: {
+  items: AnyRecord[];
+  busy: boolean;
+  onBack: () => void;
+  onSubmit: (options: Record<string, ModifierSelection[]>) => void;
+}) {
+  const [selections, setSelections] = useState<Record<string, Record<string, string[]>>>({});
+  const [optionError, setOptionError] = useState("");
+
+  function groupId(group: AnyRecord) {
+    return String(group.menu_group_id ?? group.menuGroupId ?? "");
+  }
+
+  function itemId(item: AnyRecord) {
+    return String(item.item_id ?? item.itemId ?? "");
+  }
+
+  function selectedFor(item: AnyRecord, group: AnyRecord) {
+    return selections[itemId(item)]?.[groupId(group)] ?? [];
+  }
+
+  function toggleOption(item: AnyRecord, group: AnyRecord, option: AnyRecord) {
+    const parentId = itemId(item);
+    const currentGroupId = groupId(group);
+    const optionValue = itemId(option);
+    const current = selectedFor(item, group);
+    const max = Number(group.max_selection ?? group.maxSelection ?? 1);
+    const next = current.includes(optionValue)
+      ? current.filter((value) => value !== optionValue)
+      : max === 1
+        ? [optionValue]
+        : current.length < max
+          ? [...current, optionValue]
+          : current;
+    setOptionError("");
+    setSelections((previous) => ({
+      ...previous,
+      [parentId]: { ...previous[parentId], [currentGroupId]: next }
+    }));
+  }
+
+  function submit() {
+    const options: Record<string, ModifierSelection[]> = {};
+    for (const item of items) {
+      const itemSelections: ModifierSelection[] = [];
+      for (const group of Array.isArray(item.required_groups) ? item.required_groups : []) {
+        const selected = selectedFor(item, group);
+        const min = Number(group.min_selection ?? group.minSelection ?? 0);
+        if (selected.length < min) {
+          setOptionError(`Choose ${min === 1 ? "an option" : `${min} options`} for ${group.name ?? "each required group"}.`);
+          return;
+        }
+        for (const optionId of selected) {
+          itemSelections.push({
+            menuGroupId: group.menu_group_id ?? group.menuGroupId,
+            itemId: optionId,
+            quantity: 1
+          });
+        }
+      }
+      options[itemId(item)] = itemSelections;
+    }
+    onSubmit(options);
+  }
+
+  return (
+    <section className="confirm-page">
+      <button className="back" onClick={onBack}><Icon name="back" /> Back to menu</button>
+      <div className="confirm-card options-card">
+        <p className="eyebrow">One more choice</p>
+        <h1>Customise your meal</h1>
+        <p className="muted">Choose the required options below and we’ll recalculate your order total.</p>
+        <div className="option-items">
+          {items.map((item) => (
+            <article className="option-item" key={itemId(item)}>
+              <div className="option-item-head">
+                <div>
+                  <p className="eyebrow">Your selection</p>
+                  <h2>{item.item_name ?? item.name ?? "Meal"}</h2>
+                </div>
+                <span>{Array.isArray(item.required_groups) ? item.required_groups.length : 0} choices</span>
+              </div>
+              {(Array.isArray(item.required_groups) ? item.required_groups : []).map((group: AnyRecord) => {
+                const selected = selectedFor(item, group);
+                const max = Number(group.max_selection ?? group.maxSelection ?? 1);
+                const min = Number(group.min_selection ?? group.minSelection ?? 0);
+                const groupOptions = Array.isArray(group.options) ? group.options : [];
+                return (
+                  <fieldset className="option-group" key={groupId(group)}>
+                    <legend>
+                      <span>{group.name ?? "Choose an option"}</span>
+                      <small>{min > 0 ? (max === 1 ? "Choose one" : `Choose up to ${max}`) : "Optional"}</small>
+                    </legend>
+                    <div className="option-list">
+                      {groupOptions.map((option: AnyRecord) => {
+                        const optionValue = itemId(option);
+                        const unavailable = option.in_stock === false || option.inStock === false;
+                        const price = Number(option.price_naira ?? option.priceNaira ?? 0);
+                        return (
+                          <label className={`option-choice ${selected.includes(optionValue) ? "selected" : ""}`} key={optionValue}>
+                            <input
+                              type={max === 1 ? "radio" : "checkbox"}
+                              name={`${itemId(item)}-${groupId(group)}`}
+                              checked={selected.includes(optionValue)}
+                              disabled={unavailable || busy}
+                              onChange={() => toggleOption(item, group, option)}
+                            />
+                            <span className="option-choice-copy">
+                              <strong>{option.name ?? "Option"}</strong>
+                              {unavailable ? <small>Sold out</small> : price > 0 ? <small>+{naira.format(price)}</small> : <small>Included</small>}
+                            </span>
+                            <span className="option-check">✓</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                );
+              })}
+            </article>
+          ))}
+        </div>
+        {optionError && <p className="option-error" role="alert">{optionError}</p>}
+        <button className="primary" disabled={busy || !items.length} onClick={submit}>
+          {busy ? "Updating review…" : "Continue to review"}
+        </button>
+        <small className="legal">Your choices are sent back to Chowdeck for an updated preview. Nothing is charged yet.</small>
       </div>
     </section>
   );

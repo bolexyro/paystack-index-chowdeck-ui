@@ -14,18 +14,58 @@ This is an independent interface powered by Paystack Index and Chowdeck. It is n
 
 ## Local setup
 
-1. Copy `.env.example` to `.env`.
-2. Add a Paystack Index OAuth client ID and secret.
-3. Start the container:
+### Prerequisites
+
+- Docker Desktop with Docker Compose v2
+- A Paystack Index OAuth client pair from the Index dashboard
+- An HTTPS tunnel only if you want to connect the local server to ChatGPT/Codex
+
+1. Copy the example environment file:
 
    ```sh
-   docker compose up --build
+   cp .env.example .env
    ```
 
-4. Health check: `http://localhost:8787/health`
-5. MCP endpoint: `http://localhost:8787/mcp`
+   In PowerShell, use `Copy-Item .env.example .env` instead.
 
-For a Codex/ChatGPT developer-mode connection, expose `/mcp` through an HTTPS tunnel and add that URL as the connector endpoint. Treat tunnel URLs and OAuth credentials as secrets.
+2. Set `PAYSTACK_INDEX_CLIENT_ID` and `PAYSTACK_INDEX_CLIENT_SECRET` in `.env`.
+   The adapter uses the client-credentials flow with the `mcp:transact` scope and
+   calls the upstream URLs in `PAYSTACK_INDEX_MCP_URL` and
+   `PAYSTACK_INDEX_TOKEN_URL`. Keep `.env` private; it is ignored by Git.
+
+3. Build and start the app:
+
+   ```sh
+   docker compose up --build -d
+   ```
+
+4. Verify the local server and inspect logs when needed:
+
+   ```sh
+   curl http://localhost:8787/health
+   docker compose logs -f app
+   ```
+
+   The MCP endpoint is `http://localhost:8787/mcp`.
+
+5. Stop the app with `docker compose down` when you are finished.
+
+### Connect the local app to ChatGPT/Codex
+
+The adapter's `/mcp` endpoint does **not** implement OAuth for the ChatGPT
+connector. Paystack Index OAuth happens inside the adapter using the values in
+`.env`.
+
+1. Expose `http://localhost:8787/mcp` through an HTTPS tunnel. Your public URL
+   must end in `/mcp`.
+2. In ChatGPT/Codex, create a custom MCP/connector using **Server URL** and
+   choose **No authentication**. Do not choose OAuth for this adapter.
+3. Paste the HTTPS `/mcp` URL, accept the custom-server warning, and save it.
+4. Start a fresh chat and try: “Find nearby Chowdeck restaurants and show the
+   options in the UI.”
+
+Only the public tunnel URL is entered in ChatGPT/Codex. Never paste the
+Paystack client secret into the connector form or commit it to the repository.
 
 ## Commands
 
